@@ -1,0 +1,267 @@
+<h1>Rechner zur finanziellen Freiheit</h1>
+<form id="finance-form">
+    <label for="initial-investment">Anfängliche Investition (€):</label>
+    <input type="number" id="initial-investment" required>
+
+    <label for="annual-investment">Jährliche Investition (€):</label>
+    <input type="number" id="annual-investment" required>
+  
+  <label for="net-income-goal">Gewünschtes Netto-Monatseinkommen (€):</label>
+<input type="number" id="net-income-goal" required>
+
+    <label for="include-tax">Steuern mitberechnen:</label>
+    <select id="include-tax" required>
+        <option value="yes">Ja</option>
+        <option value="no">Nein</option>
+    </select>
+
+    <label for="dividend-yield">Aktuelle Dividendenrendite (%):</label>
+    <input type="number" id="dividend-yield" step="0.01" required>
+
+    <label for="dividend-growth-rate">Wachstumsrate der Dividende (%):</label>
+    <input type="number" id="dividend-growth-rate" step="0.01" required>
+
+    <label for="reinvest-dividends">Dividenden reinvestieren:</label>
+    <select id="reinvest-dividends" required>
+        <option value="yes">Ja</option>
+        <option value="no">Nein</option>
+    </select>
+
+    <label for="investment-duration">Anlagedauer (Jahre):</label>
+    <input type="number" id="investment-duration" required>
+
+    <label for="annual-growth">Jährlicher Kurszuwachs (%):</label>
+    <input type="number" id="annual-growth" step="0.01" required>
+
+    <div class="btn-container">
+        <button type="submit">Berechnen</button>
+        <button type="button" id="export-pdf">Export als PDF</button>
+    </div>
+</form>
+
+<div class="result-table">
+    <table id="results-table">
+        <thead>
+            <tr>
+                <th>Jahr</th>
+                <th>Investition (€)</th>
+                <th>Startkapital (€)</th>
+                <th>Dividende (€)</th>
+                <th>Steuer (€)</th>
+                <th>Wertsteigerung (€)</th>
+                <th>Endkapital (€)</th>
+                <th>Dividendenrendite (%)</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<div class="chart-container">
+    <canvas id="capitalChart"></canvas>
+</div>
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    padding: 0;
+    background-color: #f4f4f9;
+}
+h1 {
+    color: #333;
+}
+form, table, .btn-container, .chart-container {
+    margin-top: 20px;
+}
+label {
+    display: block;
+    margin: 10px 0 5px;
+}
+input, select, button {
+    padding: 8px;
+    width: 100%;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+th, td {
+    text-align: left;
+    padding: 10px;
+    border: 1px solid #ccc;
+}
+th {
+    background-color: #f2f2f2;
+}
+.result-table {
+    overflow-x: auto;
+}
+.btn-container {
+    display: flex;
+    justify-content: space-between;
+}
+@media (max-width: 768px) {
+    table {
+        font-size: 12px;
+    }
+    button {
+        width: 48%;
+    }
+}
+@media (max-width: 480px) {
+    h1 {
+        font-size: 1.5em;
+    }
+    label {
+        font-size: 14px;
+    }
+    input, select, button {
+        font-size: 14px;
+    }
+}
+.chart-container {
+    margin-top: 30px;
+    text-align: center;
+}
+canvas {
+    max-width: 100%;
+    height: auto;
+}
+
+document.getElementById('finance-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    // Eingaben erfassen
+    const initialInvestment = parseFloat(document.getElementById('initial-investment').value);
+    const annualInvestment = parseFloat(document.getElementById('annual-investment').value);
+    const includeTax = document.getElementById('include-tax').value === 'yes';
+    const initialDividendYield = parseFloat(document.getElementById('dividend-yield').value) / 100;
+    const dividendGrowthRate = parseFloat(document.getElementById('dividend-growth-rate').value) / 100;
+    const reinvestDividends = document.getElementById('reinvest-dividends').value === 'yes';
+    const investmentDuration = parseInt(document.getElementById('investment-duration').value, 10);
+    const annualGrowth = parseFloat(document.getElementById('annual-growth').value) / 100;
+    const netIncomeGoal = parseFloat(document.getElementById('net-income-goal').value) * 12; // Jahresziel
+
+    const TAX_RATE = 0.26375;
+    const resultsTableBody = document.querySelector('#results-table tbody');
+    resultsTableBody.innerHTML = '';
+    const capitalData = [];
+    let financialFreedomYear = null; // Jahr, in dem finanzielle Freiheit erreicht wird
+
+    let startCapital = initialInvestment;
+    let currentDividendYield = initialDividendYield;
+
+    for (let year = 1; year <= investmentDuration; year++) {
+        // Dividenden berechnen
+        const dividend = startCapital * currentDividendYield;
+        const tax = includeTax ? dividend * TAX_RATE : 0;
+        const netDividend = dividend - tax;
+
+        // Kapitalwachstum berechnen
+        let capitalIncrease = startCapital * annualGrowth;
+        let endCapital = startCapital + capitalIncrease + annualInvestment;
+
+        if (reinvestDividends) {
+            endCapital += netDividend;
+        }
+
+        const dividendReturn = (netDividend / startCapital) * 100;
+
+        // Prüfen, ob Ziel erreicht wird
+        if (financialFreedomYear === null && netDividend >= netIncomeGoal) {
+            financialFreedomYear = year;
+        }
+
+        // Tabelle aktualisieren
+        const row = `
+            <tr ${netDividend >= netIncomeGoal ? 'style="background-color: #d4edda;"' : ''}>
+                <td>${year}</td>
+                <td>${annualInvestment.toFixed(2)}</td>
+                <td>${startCapital.toFixed(2)}</td>
+                <td>${dividend.toFixed(2)}</td>
+                <td>${tax.toFixed(2)}</td>
+                <td>${capitalIncrease.toFixed(2)}</td>
+                <td>${endCapital.toFixed(2)}</td>
+                <td>${dividendReturn.toFixed(2)}</td>
+            </tr>
+        `;
+        resultsTableBody.innerHTML += row;
+
+        capitalData.push({ year, endCapital, netDividend });
+        startCapital = endCapital;
+        currentDividendYield *= (1 + dividendGrowthRate); // Dividendenrendite wächst
+    }
+
+    updateChart(capitalData, netIncomeGoal);
+});
+
+function updateChart(capitalData, netIncomeGoal) {
+    const ctx = document.getElementById('capitalChart').getContext('2d');
+    const years = capitalData.map(data => `Jahr ${data.year}`);
+    const values = capitalData.map(data => data.endCapital);
+    const dividendValues = capitalData.map(data => data.netDividend);
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: years,
+            datasets: [
+                {
+                    label: 'Endkapital (€)',
+                    data: values,
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 2,
+                    fill: false,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Netto-Dividenden (€)',
+                    data: dividendValues,
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    borderWidth: 2,
+                    fill: false,
+                    yAxisID: 'y1' // Zuweisung zur zweiten Achse
+                },
+                {
+                    label: 'Netto-Einkommensziel (€)',
+                    data: Array(years.length).fill(netIncomeGoal),
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1,
+                    borderDash: [10, 5],
+                    yAxisID: 'y1' // Zuweisung zur zweiten Achse
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: true }
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    position: 'left',
+                    title: { display: true, text: 'Endkapital (€)' },
+                    ticks: {
+                        callback: value => `${value.toLocaleString()} €`
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    position: 'right',
+                    title: { display: true, text: 'Netto-Dividenden (€)' },
+                    grid: {
+                        drawOnChartArea: false // Keine Gitterlinien über das Diagramm der Hauptachse
+                    },
+                    ticks: {
+                        callback: value => `${value.toLocaleString()} €`
+                    }
+                }
+            }
+        }
+    });
+}
